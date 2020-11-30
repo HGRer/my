@@ -83,39 +83,44 @@ public class HttpUtil {
 			int request_line_crlf_index = -1;
 			boolean request_line_find = false;
 			bufferedInputStream.mark(0);
-			while (bufferedInputStream.available() > 0 && !request_line_find) {
-				int cr = bufferedInputStream.read();
-				if (cr == 13 && bufferedInputStream.available() > 0) {
-					if (bufferedInputStream.read() == 10) {
-						request_line_find = true;
-						break;
+			while (bufferedInputStream.available() > 0) {
+				request_line_crlf_index++;
+				if (bufferedInputStream.read() == 13) {
+					if (bufferedInputStream.available() > 0) {
+						request_line_crlf_index++;
+						if (bufferedInputStream.read() == 10) {
+							request_line_find = true;
+							break;
+						}
 					}
 				}
-				request_line_crlf_index++;
 			}
 			
-			System.out.println("crlf_index: " + request_line_crlf_index);
-			
-			// headers存在的话，有两个CRLF，不然只有一个CRLF
-			int header_crlf_index = request_line_crlf_index + 2;
+			int header_crlf_index = request_line_crlf_index;
+			System.out.println("begin of header index:" + header_crlf_index);
 			boolean header_find = false;
 			while (bufferedInputStream.available() > 0) {
-				int cr = bufferedInputStream.read();
-				if (cr == 13 && bufferedInputStream.available() > 0) {
-					if (bufferedInputStream.read() == 10) {
-						// 找到第一个CRLF，如果接下来的两个字节还是CRLF，那么可以判定有headers
-						if (bufferedInputStream.available() > 0 && bufferedInputStream.read() == 13) {
-							if (bufferedInputStream.available() > 0 && bufferedInputStream.read() == 10) {
-								// 有headers
-								header_find = true;
+				header_crlf_index++;
+				if (bufferedInputStream.read() == 13) {
+					if (bufferedInputStream.available() > 0) {
+						header_crlf_index++;
+						if (bufferedInputStream.read() == 10) {
+							if (bufferedInputStream.available() > 0) {
+								header_crlf_index++;
+								if (bufferedInputStream.read() == 13) {
+									if (bufferedInputStream.available() > 0) {
+										header_crlf_index++;
+										if (bufferedInputStream.read() == 10) {
+											header_find = true;
+											break;
+										}
+									}
+								}
 							}
-						} else {
-							// 无headers
 						}
-						break;
 					}
 				}
-				header_crlf_index++;
+				
 			}
 			System.out.println("header_crlf_index: " + header_crlf_index);
 			
@@ -129,7 +134,7 @@ public class HttpUtil {
 			bufferedInputStream.reset();
 			System.out.println();
 			if (request_line_find) {
-				byte[] byteArray = new byte[request_line_crlf_index + 2];
+				byte[] byteArray = new byte[request_line_crlf_index + 1];
 				bufferedInputStream.read(byteArray);
 				System.out.println("request_line is: " + new String(byteArray));
 			}
@@ -137,7 +142,8 @@ public class HttpUtil {
 			if (header_find) {
 				byte[] byteArray = new byte[header_crlf_index - request_line_crlf_index];
 				bufferedInputStream.read(byteArray);
-				System.out.println("header_line is: " + new String(byteArray));
+				System.out.println("header_line is:");
+				System.out.print(new String(byteArray));
 			} else {
 				System.out.println("not find header_line");
 			}
