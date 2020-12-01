@@ -13,17 +13,25 @@ import com.hgr.httpserver.constant.HttpUtil;
 public class HttpServer {
 	public static void main(String[] args) {
 		try (ServerSocket serverSocket = new ServerSocket(9001);) {
-			try (Socket socket = serverSocket.accept();) {
-				InputStream in = socket.getInputStream();
-				OutputStream out = socket.getOutputStream();
-				
-				HttpUtil.parseRequestStream2(in);
-				
-				try (PrintWriter pw = new PrintWriter(out)) {
-					pw.write("Hello!");
-					pw.flush();
-				}
-			}
+//			while(true) {
+				Socket socket = serverSocket.accept();
+				new Thread(new Runnable() {
+					@Override
+					public void run() {
+						try {
+							InputStream in = socket.getInputStream();
+							OutputStream out = socket.getOutputStream();
+							HttpUtil.parseRequestStream(in);
+							try (PrintWriter pw = new PrintWriter(out)) {
+								pw.write("Hello!");
+								pw.flush();
+							}
+						} catch(IOException e) {
+							e.printStackTrace();
+						}
+					}
+				}).start();
+//			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

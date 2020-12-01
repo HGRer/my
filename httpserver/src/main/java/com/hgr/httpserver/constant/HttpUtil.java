@@ -9,65 +9,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 public class HttpUtil {
-	// Request，CRLF的二进制是1310
-	// start-line+CRLF
-	// headers+CRLF
-	// CRLF
-	// body
-	/**
-	 * 解析Request字节流.
-	 * <p>当前方法仅仅适合与HTTP1.1版本，因为该版本的客户端对Request格式有严格的标准。
-	 * @throws IOException 
-	 * @throws Exception
-	 */
-	public static void parseRequestStream(InputStream in) throws IOException {
-		// 先接收完再解析
-		long start = System.currentTimeMillis();
-		try (BufferedInputStream bufferedInputStream = new BufferedInputStream(in);) {
-			byte[] buffer1 = new byte[1024];
-			int read_result = bufferedInputStream.read(buffer1);
-			int buffer_map_key = 1;
-			Map<Integer, byte[]> buffer_map = new HashMap<>();
-			buffer_map.put(buffer_map_key, buffer1);
-
-			while (read_result == 1024 && bufferedInputStream.available() > 0) {
-				// 还有数据要读取
-				byte[] temp = new byte[1024];
-				read_result = bufferedInputStream.read(temp);
-				buffer_map.put(buffer_map_key++, temp);
-			}
-
-			// start-line标准： Method SP Request-URI SP HTTP-Version CRLF
-			buffer_map_key = 1;
-			int start_line_index = -1;
-			while (buffer_map.get(buffer_map_key) != null && start_line_index == -1) {
-				byte[] temp_buffer = buffer_map.get(buffer_map_key);
-				int temp_index = 0;
-				while (temp_buffer.length > (temp_index + 1)) {
-					// 以两个字节为一组找到CRLF，即找到start-line
-					if (temp_buffer[temp_index] == 13 && temp_buffer[temp_index + 1] == 10) {
-						start_line_index = temp_index;
-						break;
-					} else {
-						temp_index++;
-					}
-				}
-				
-				if (start_line_index == -1) {
-					buffer_map_key++; // 从下一个字节数组找CRLF
-				} else {
-					break;
-				}
-			}
-			
-			System.out.println("buffer_map_index: " + buffer_map_key + ", start_line_index: " + start_line_index);
-			
-			if (start_line_index != -1) {
-				System.out.println(new String(buffer_map.get(buffer_map_key), 0, start_line_index));
-			}
-		}
-		System.out.println("cost:" + (System.currentTimeMillis() - start));
-	}
+	private static Map<String, Object> requestMap = new HashMap<>();
 	
 	/**
 	 *  解析Request字节流.
@@ -75,11 +17,9 @@ public class HttpUtil {
 	 * @param in
 	 * @throws IOException
 	 */
-	public static void parseRequestStream2(InputStream in) throws IOException {
-		// 先接收完再解析
-		long start = System.currentTimeMillis();
+	public static Map<String, Object> parseRequestStream(InputStream in) throws IOException {
 		try (BufferedInputStream bufferedInputStream = new BufferedInputStream(in);) {
-			// 解析start-line
+			// 解析request-line
 			int request_line_crlf_index = -1;
 			boolean request_line_find = false;
 			bufferedInputStream.mark(0);
@@ -96,56 +36,40 @@ public class HttpUtil {
 				}
 			}
 			
-			int header_crlf_index = request_line_crlf_index;
-			System.out.println("begin of header index:" + header_crlf_index);
-			boolean header_find = false;
-			while (bufferedInputStream.available() > 0) {
-				header_crlf_index++;
-				if (bufferedInputStream.read() == 13) {
-					if (bufferedInputStream.available() > 0) {
-						header_crlf_index++;
-						if (bufferedInputStream.read() == 10) {
-							if (bufferedInputStream.available() > 0) {
-								header_crlf_index++;
-								if (bufferedInputStream.read() == 13) {
-									if (bufferedInputStream.available() > 0) {
-										header_crlf_index++;
-										if (bufferedInputStream.read() == 10) {
-											header_find = true;
-											break;
-										}
-									}
-								}
-							}
-						}
-					}
+			if (request_line_find) {
+				// 解析header
+				int header_crlf_index = -1;
+				if (bufferedInputStream.available() > 0) {
+					header_crlf_index = parseHeader(request_line_crlf_index, bufferedInputStream);
 				}
 				
-			}
-			System.out.println("header_crlf_index: " + header_crlf_index);
-			
-			// body
-			if (bufferedInputStream.available() > 0) {
-				
-			} else {
-				
-			}
-			
-			bufferedInputStream.reset();
-			System.out.println();
-			if (request_line_find) {
+				// 将requestLine值解析放入到requestMap
+				bufferedInputStream.reset();
 				byte[] byteArray = new byte[request_line_crlf_index + 1];
 				bufferedInputStream.read(byteArray);
-				System.out.println("request_line is: " + new String(byteArray));
-			}
-			
-			if (header_find) {
-				byte[] byteArray = new byte[header_crlf_index - request_line_crlf_index];
-				bufferedInputStream.read(byteArray);
-				System.out.println("header_line is:");
-				System.out.print(new String(byteArray));
+				String requestLine = new String(byteArray);
+				String[] requestLineArray = requestLine.split(" ");
+				if (requestLineArray.length != 3) {
+					throw new IOException("HttpRequest_requestLine format error/request_line格式错误");
+				}
+				requestMap.put("REQUEST_METHOD", requestLineArray[0]);
+				requestMap.put("REQUEST_URI", requestLineArray[1]);
+				requestMap.put("REQUEST_HTTP_Version", requestLineArray[2]);
+				System.out.println(requestMap);
+				
+				if (header_crlf_index != -1) {
+					byte[] headerBuffer = new byte[header_crlf_index - request_line_crlf_index];
+					bufferedInputStream.read(headerBuffer);
+					String header = new String(headerBuffer);
+					System.out.println(header);
+				}
+				
+				// 根据Request Method 决定是否需要解析body
+				if (bufferedInputStream.available() > 0 && !"GET".equals(requestMap.get("REQUEST_METHOD"))) {
+					
+				}
 			} else {
-				System.out.println("not find header_line");
+				throw new IOException("HttpRequest format error/没有找到request_line");
 			}
 			
 			bufferedInputStream.reset();
@@ -155,6 +79,42 @@ public class HttpUtil {
 			System.out.println("Total: ");
 			System.out.println(new String(byteArray));
 		}
-		System.out.println("cost:" + (System.currentTimeMillis() - start));
+		
+		return requestMap;
+	}
+	
+	private static int parseHeader(int request_line_crlf_index, BufferedInputStream bufferedInputStream) throws IOException {
+		// 解析headers
+		int header_crlf_index = request_line_crlf_index;
+		
+		boolean header_find = false;
+		while (bufferedInputStream.available() > 0) {
+			header_crlf_index++;
+			if (bufferedInputStream.read() == 13) {
+				if (bufferedInputStream.available() > 0) {
+					header_crlf_index++;
+					if (bufferedInputStream.read() == 10) {
+						if (bufferedInputStream.available() > 0) {
+							header_crlf_index++;
+							if (bufferedInputStream.read() == 13) {
+								if (bufferedInputStream.available() > 0) {
+									header_crlf_index++;
+									if (bufferedInputStream.read() == 10) {
+										header_find = true;
+										break;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		
+		if (header_find) {
+			return header_crlf_index;
+		}
+		
+		return -1;
 	}
 }
