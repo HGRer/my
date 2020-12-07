@@ -1,0 +1,5 @@
+GET http://127.0.0.1:9000/ktin/api/conf/flowids HTTP/1.1
+Accept-Encoding: gzip,deflate
+Host: 127.0.0.1:9000
+Connection: Keep-Alive
+User-Agent: Apache-HttpClient/4.1.1 (java 1.5)

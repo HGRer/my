@@ -1,11 +1,14 @@
 package com.hgr.httpserver;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 import com.hgr.httpserver.constant.HttpUtil;
 
@@ -38,6 +41,12 @@ public class HttpServer {
 	}
 
 	public synchronized static void printError(Exception e) {
+		try {
+			Files.newOutputStream(Paths.get("asdf"));
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
+		
 		System.out.println(Thread.currentThread().getName() + "--------------------");
 		e.printStackTrace();
 	}

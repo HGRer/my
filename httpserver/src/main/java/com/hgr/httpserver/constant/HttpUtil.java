@@ -7,6 +7,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.math.NumberUtils;
+
 public class HttpUtil {
 	private static Map<String, Object> requestMap = new HashMap<>();
 
@@ -21,12 +24,11 @@ public class HttpUtil {
 	public static Map<String, Object> parseRequestStream(InputStream in) throws IOException {
 		BufferedInputStream bufferedInputStream = new BufferedInputStream(in);
 		bufferedInputStream.mark(0);
-
-		byte[] totalArray = new byte[1024];
-		bufferedInputStream.read(totalArray);
-		System.out.println();
-		System.out.println(Thread.currentThread().getName() + " Total: ");
-		System.out.println(new String(totalArray));
+		
+		System.out.println("-----------Request完整消息体-----------");
+		byte[] showAll = new byte[1024];
+		bufferedInputStream.read(showAll);
+		System.out.println(new String(showAll, "GBK"));
 		bufferedInputStream.reset();
 
 		// 解析request-line
@@ -94,13 +96,28 @@ public class HttpUtil {
 						}
 					}
 				}
+				System.out.println("------ headerMap ------");
 				System.out.println(headerMap);
+				requestMap.put(HttpConstant.HTTP_HEADER, headerMap);
 			}
 
 			// 根据Request Method 决定是否需要解析body
 			if (bufferedInputStream.available() > 0
-					&& !HttpConstant.HTTP_REQUEST_METHOD_GET.equals(requestMap.get(HttpConstant.HTTP_REQUEST_METHOD))) {
-
+					&& !HttpConstant.HTTP_REQUEST_METHOD_GET.equals(requestMap.get(HttpConstant.HTTP_REQUEST_METHOD))
+					&& requestMap.get(HttpConstant.HTTP_HEADER) != null) {
+				@SuppressWarnings("unchecked")
+				Map<String, String> headerMap = (Map<String, String>) requestMap.get(HttpConstant.HTTP_HEADER);
+				String contentLengthStr = (String) headerMap.get(HttpConstant.HTTP_HEADER_CONTENT_LENGTH);
+				if (StringUtils.isNotBlank(contentLengthStr)) {
+					contentLengthStr = contentLengthStr.trim();
+					if (NumberUtils.isCreatable(contentLengthStr)) {
+						int contentLength = NumberUtils.createInteger(contentLengthStr);
+						byte[] contentBuffer = new byte[contentLength];
+						bufferedInputStream.read(contentBuffer);
+						System.out.println("------ content ------");
+						System.out.println(new String(contentBuffer, "GBK"));
+					}
+				}
 			}
 		} else {
 			throw new IOException(Thread.currentThread().getName() + " HttpRequest format error/没有找到request_line");
